@@ -1,4 +1,5 @@
 .vscode/
+!.vscode/tasks.json
 
 # Local History for Visual Studio Code
 .history/
