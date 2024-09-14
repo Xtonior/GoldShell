@@ -111,7 +111,7 @@ void transform_normal(Vec4 *normal, Matrix4x4 *modelMatrix, Vec4 *out)
     // vec4_normalize(&transformedNormal, out);
 }
 
-void render_polygon_wired(SDL_Renderer *renderer, Vec4 *v1, Vec4 *v2, Vec4 *v3, Matrix4x4 *modelMatrix, Matrix4x4 *projectionMatrix, Vec4 *normal)
+void render_polygon_wired(SDL_Renderer *renderer, Vec4 *v1, Vec4 *v2, Vec4 *v3, Matrix4x4 *modelMatrix, Matrix4x4 *projectionMatrix)
 {
     Vec4 transformedVertex1 = multiplyMatrixVec4(modelMatrix, v1);
     Vec4 transformedVertex2 = multiplyMatrixVec4(modelMatrix, v2);
@@ -122,25 +122,31 @@ void render_polygon_wired(SDL_Renderer *renderer, Vec4 *v1, Vec4 *v2, Vec4 *v3, 
     Vec4 projectedVertex2 = applyPerspectiveProjection(projectionMatrix, &transformedVertex2);
     Vec4 projectedVertex3 = applyPerspectiveProjection(projectionMatrix, &transformedVertex3);
 
-    Vec4 edge1 = vec4_sub(&projectedVertex2, &projectedVertex1);
-    Vec4 edge2 = vec4_sub(&projectedVertex3, &projectedVertex1);
+    float x1 = (projectedVertex1.x + 1) * SCREEN_WIDTH_HALF;
+    float y1 = (projectedVertex1.y + 1) * SCREEN_HEIGHT_HALF;
 
-    Vec4 s_normal = vec4_mul(&edge1, &edge2);
+    float x2 = (projectedVertex2.x + 1) * SCREEN_WIDTH_HALF;
+    float y2 = (projectedVertex2.y + 1) * SCREEN_HEIGHT_HALF;
 
-    s_normal.z = 1.0f;
+    float x3 = (projectedVertex3.x + 1) * SCREEN_WIDTH_HALF;
+    float y3 = (projectedVertex3.y + 1) * SCREEN_HEIGHT_HALF;
 
-    Vec4 view = vec4_neg(&CAMERA_NORMAL);
+    Vec4 u = vec4_sub(&transformedVertex2, &transformedVertex1); 
+    Vec4 v = vec4_sub(&transformedVertex3, &transformedVertex1); 
 
-    float dot_product = dot(&s_normal, &CAMERA_NORMAL);
+    Vec4 cross = vec4_cross(&u, &v);
+    Vec4 cn = CAMERA_NORMAL;
 
-    float facing = (projectedVertex2.x - projectedVertex1.x)*(projectedVertex3.x - projectedVertex1.x) - (projectedVertex2.y - projectedVertex1.y)*(projectedVertex3.y - projectedVertex1.y);
+    double dot_product = dot(&cross, &cn);
 
-    if (facing < __FLT_EPSILON__)
+    if (dot_product < __DBL_EPSILON__)
+    {
         return;
+    }
 
-    SDL_RenderDrawLineF(renderer, (projectedVertex1.x + 1) * SCREEN_WIDTH_HALF, (projectedVertex1.y + 1) * SCREEN_HEIGHT_HALF, (projectedVertex2.x + 1) * SCREEN_WIDTH_HALF, (projectedVertex2.y + 1) * SCREEN_HEIGHT_HALF);
-    SDL_RenderDrawLineF(renderer, (projectedVertex2.x + 1) * SCREEN_WIDTH_HALF, (projectedVertex2.y + 1) * SCREEN_HEIGHT_HALF, (projectedVertex3.x + 1) * SCREEN_WIDTH_HALF, (projectedVertex3.y + 1) * SCREEN_HEIGHT_HALF);
-    SDL_RenderDrawLineF(renderer, (projectedVertex3.x + 1) * SCREEN_WIDTH_HALF, (projectedVertex3.y + 1) * SCREEN_HEIGHT_HALF, (projectedVertex1.x + 1) * SCREEN_WIDTH_HALF, (projectedVertex1.y + 1) * SCREEN_HEIGHT_HALF);
+    SDL_RenderDrawLineF(renderer, x1, y1, x2, y2);
+    SDL_RenderDrawLineF(renderer, x2, y2, x3, y3);
+    SDL_RenderDrawLineF(renderer, x3, y3, x1, y1);
 }
 
 void render_polygon(SDL_Renderer *renderer, Vec4 *v1, Vec4 *v2, Vec4 *v3, Matrix4x4 *modelMatrix, Matrix4x4 *projectionMatrix, Vec4 *normal)
@@ -197,6 +203,22 @@ void render_polygon(SDL_Renderer *renderer, Vec4 *v1, Vec4 *v2, Vec4 *v3, Matrix
     }
 }
 
+void render_plane(Vec4 plane[6], Matrix4x4 *model, Matrix4x4 *proj)
+{
+    for (unsigned int i = 0; i < 6; i += 3)
+    {
+        render_polygon_wired(ren, &plane[i], &plane[i + 1], &plane[i + 2], model, proj);
+    }
+}
+
+void render_cube(float *cube[36], Matrix4x4 *model, Matrix4x4 *proj)
+{
+    for (unsigned int i = 0; i < 36; i += 3)
+    {
+        render_polygon_wired(ren, &cube[i], &cube[i + 1], &cube[i + 2], model, proj);
+    }
+}
+
 int WinMain(int argc, char **args)
 {
     if (init() == 1)
@@ -228,70 +250,102 @@ int WinMain(int argc, char **args)
     Matrix4x4 projectionMatrix = getPerspectiveProjection(fov, ASPECT_RATIO, zNear, zFar);
 
     // Define a vertices in 3D space (with w = 1 for homogeneous coordinates)
-    Vec4 verts[36] = {
-    // Front face (two triangles, CCW)
-    {-0.5f, -0.5f, 0.5f, 1.0f},
-    {0.5f, -0.5f, 0.5f, 1.0f},
-    {-0.5f, 0.5f, 0.5f, 1.0f},
-    {-0.5f, 0.5f, 0.5f, 1.0f},
-    {0.5f, -0.5f, 0.5f, 1.0f},
-    {0.5f, 0.5f, 0.5f, 1.0f},
+    Vec4 verts_cube[36] = {
+        // Front face (two triangles, CCW)
+        {0.5f, 0.5f, 0.5f, 1.0f},
+        {-0.5f, -0.5f, 0.5f, 1.0f},
+        {0.5f, -0.5f, 0.5f, 1.0f},
+        {0.5f, 0.5f, 1.5f, 1.0f},
+        {-0.5f, -0.5f, 1.5f, 1.0f},
+        {-0.5f, 0.5f, 1.5f, 1.0f},
 
-    // Back face (two triangles, CCW)
-    {0.5f, -0.5f, -0.5f, 1.0f},
-    {-0.5f, -0.5f, -0.5f, 1.0f},
-    {0.5f, 0.5f, -0.5f, 1.0f},
-    {0.5f, 0.5f, -0.5f, 1.0f},
-    {-0.5f, -0.5f, -0.5f, 1.0f},
-    {-0.5f, 0.5f, -0.5f, 1.0f},
+        // Back face (two triangles, CCW)
+        {0.5f, -0.5f, -0.5f, 1.0f},
+        {0.5f, 0.5f, -0.5f, 1.0f},
+        {-0.5f, 0.5f, -0.5f, 1.0f},
+        {-0.5f, 0.5f, -0.5f, 1.0f},
+        {-0.5f, -0.5f, -0.5f, 1.0f},
+        {0.5f, -0.5f, -0.5f, 1.0f},
 
-    // Left face (two triangles, CCW)
-    {-0.5f, -0.5f, -0.5f, 1.0f},
-    {-0.5f, 0.5f, -0.5f, 1.0f},
-    {-0.5f, -0.5f, 0.5f, 1.0f},
-    {-0.5f, -0.5f, 0.5f, 1.0f},
-    {-0.5f, 0.5f, -0.5f, 1.0f},
-    {-0.5f, 0.5f, 0.5f, 1.0f},
+        // Left face (two triangles, CCW)
+        {-0.5f, -0.5f, 0.5f, 1.0f},
+        {-0.5f, 0.5f, 0.5f, 1.0f},
+        {-0.5f, 0.5f, -0.5f, 1.0f},
+        {-0.5f, 0.5f, -0.5f, 1.0f},
+        {-0.5f, -0.5f, -0.5f, 1.0f},
+        {-0.5f, -0.5f, 0.5f, 1.0f},
 
-    // Right face (two triangles, CCW)
-    {0.5f, -0.5f, 0.5f, 1.0f},
-    {0.5f, 0.5f, 0.5f, 1.0f},
-    {0.5f, -0.5f, -0.5f, 1.0f},
-    {0.5f, -0.5f, -0.5f, 1.0f},
-    {0.5f, 0.5f, 0.5f, 1.0f},
-    {0.5f, 0.5f, -0.5f, 1.0f},
+        // Right face (two triangles, CCW)
+        {0.5f, 0.5f, -0.5f, 1.0f},
+        {0.5f, -0.5f, -0.5f, 1.0f},
+        {0.5f, -0.5f, 0.5f, 1.0f},
+        {0.5f, -0.5f, 0.5f, 1.0f},
+        {0.5f, 0.5f, 0.5f, 1.0f},
+        {0.5f, 0.5f, -0.5f, 1.0f},
 
-    // Top face (two triangles, CCW)
-    {0.5f, 0.5f, 0.5f, 1.0f},
-    {-0.5f, 0.5f, 0.5f, 1.0f},
-    {0.5f, 0.5f, -0.5f, 1.0f},
-    {0.5f, 0.5f, -0.5f, 1.0f},
-    {-0.5f, 0.5f, 0.5f, 1.0f},
-    {-0.5f, 0.5f, -0.5f, 1.0f},
+        // Top face (two triangles, CCW)
+        {-0.5f, 0.5f, 0.5f, 1.0f},
+        {-0.5f, 0.5f, -0.5f, 1.0f},
+        {0.5f, 0.5f, -0.5f, 1.0f},
+        {0.5f, 0.5f, -0.5f, 1.0f},
+        {0.5f, 0.5f, 0.5f, 1.0f},
+        {-0.5f, 0.5f, 0.5f, 1.0f},
 
-    // Bottom face (two triangles, CCW)
-    {-0.5f, -0.5f, 0.5f, 1.0f},
-    {0.5f, -0.5f, 0.5f, 1.0f},
-    {-0.5f, -0.5f, -0.5f, 1.0f},
-    {-0.5f, -0.5f, -0.5f, 1.0f},
-    {0.5f, -0.5f, 0.5f, 1.0f},
-    {0.5f, -0.5f, -0.5f, 1.0f}
-};
+        // Bottom face (two triangles, CCW)
+        {0.5f, -0.5f, -0.5f, 1.0f},
+        {0.5f, -0.5f, 0.5f, 1.0f},
+        {-0.5f, -0.5f, 0.5f, 1.0f},
+        {-0.5f, -0.5f, 0.5f, 1.0f},
+        {-0.5f, -0.5f, -0.5f, 1.0f},
+        {0.5f, -0.5f, -0.5f, 1.0f}};
 
-    Vec4 normals[12] =
-        {
-            {0.0f, 0.0f, -1.0f, 1.0f},
-            {0.0f, 0.0f, -1.0f, 1.0f},
-            {0.0f, 0.0f, 1.0f, 1.0f},
-            {0.0f, 0.0f, 1.0f, 1.0f},
-            {1.0f, 0.0f, 0.0f, 1.0f},
-            {1.0f, 0.0f, 0.0f, 1.0f},
-            {-1.0f, 0.0f, 0.0f, 1.0f},
-            {-1.0f, 0.0f, 0.0f, 1.0f},
-            {0.0f, -1.0f, 0.0f, 1.0f},
-            {0.0f, -1.0f, 0.0f, 1.0f},
-            {0.0f, 1.0f, 0.0f, 1.0f},
-            {0.0f, 1.0f, 0.0f, 1.0f}};
+    Vec4 verts_plane_f[6] = {
+        {0.5f, 0.5f, -0.5f, 1.0f},
+        {-0.5f, 0.5f, -0.5f, 1.0f},
+        {-0.5f, -0.5f, -0.5f, 1.0f},
+        {-0.5f, -0.5f, -0.5f, 1.0f},
+        {0.5f, -0.5f, -0.5f, 1.0f},
+        {0.5f, 0.5f, -0.5f, 1.0f}};
+
+    Vec4 verts_plane_b[6] = {
+        {0.5f, 0.5f, 0.5f, 1.0f},
+        {0.5f, -0.5f, 0.5f, 1.0f},
+        {-0.5f, -0.5f, 0.5f, 1.0f},
+        {-0.5f, -0.5f, 0.5f, 1.0f},
+        {-0.5f, 0.5f, 0.5f, 1.0f},
+        {0.5f, 0.5f, 0.5f, 1.0f}};
+
+    Vec4 verts_plane_l[6] = {
+        {-0.5f, 0.5f, 0.5f, 1.0f},
+        {-0.5f, -0.5f, 0.5f, 1.0f},
+        {-0.5f, 0.5f, -0.5f, 1.0f},
+        {-0.5f, 0.5f, -0.5f, 1.0f},
+        {-0.5f, -0.5f, 0.5f, 1.0f},
+        {-0.5f, -0.5f, -0.5f, 1.0f}};
+
+    Vec4 verts_plane_r[6] = {
+        {0.5f, 0.5f, 0.5f, 1.0f},
+        {0.5f, 0.5f, -0.5f, 1.0f},
+        {0.5f, -0.5f, 0.5f, 1.0f},
+        {0.5f, -0.5f, 0.5f, 1.0f},
+        {0.5f, 0.5f, -0.5f, 1.0f},
+        {0.5f, -0.5f, -0.5f, 1.0f}};
+
+    Vec4 verts_plane_t[6] = {
+        {0.5f, 0.5f, 0.5f, 1.0f},
+        {-0.5f, 0.5f, 0.5f, 1.0f},
+        {0.5f, 0.5f, -0.5f, 1.0f},
+        {0.5f, 0.5f, -0.5f, 1.0f},
+        {-0.5f, 0.5f, 0.5f, 1.0f},
+        {-0.5f, 0.5f, -0.5f, 1.0f}};
+
+    Vec4 verts_plane_bt[6] = {
+        {0.5f, -0.5f, 0.5f, 1.0f},
+        {0.5f, -0.5f, -0.5f, 1.0f},
+        {-0.5f, -0.5f, -0.5f, 1.0f},
+        {-0.5f, -0.5f, -0.5f, 1.0f},
+        {-0.5f, -0.5f, 0.5f, 1.0f},
+        {0.5f, -0.5f, 0.5f, 1.0f}};
 
     float oldTime = SDL_GetTicks();
 
@@ -304,24 +358,22 @@ int WinMain(int argc, char **args)
 
         SDL_SetRenderDrawColor(ren, 255, 255, 255, SDL_ALPHA_OPAQUE);
 
-        Vec4 movement = {0.0f, sinf(SDL_GetTicks() * 0.001f), 10.0f};
+        Vec4 movement = {0.0f, sinf(SDL_GetTicks() * 0.00f), 10.0f};
 
         Matrix4x4 rotationMatrix = getRotationMatrixY(SDL_GetTicks() * 0.001f);
+        Matrix4x4 extra_rotationMatrix = getRotationMatrixX(SDL_GetTicks() * 0.001f);
+        Matrix4x4 mul_rot = multiplyMatrix4x4(extra_rotationMatrix, rotationMatrix);
         Matrix4x4 translationMatrix = getTranslationMatrix(movement.x, movement.y, movement.z);
 
-        Matrix4x4 modelMatrix = multiplyMatrix4x4(translationMatrix, rotationMatrix);
+        Matrix4x4 modelMatrix = multiplyMatrix4x4(translationMatrix, mul_rot);
 
         // Make clear: object_space -> world_space (model) -> camera_space (view) -> screen_space (projection)
-        for (unsigned int i = 0; i < 36; i += 3)
-        {
-            Vec4 normal = {0.0f, 0.0f, 0.0f, 0.0f};
-
-            unsigned int face = floor(i / 3);
-
-            transform_normal(&normals[face], &modelMatrix, &normal);
-            // printf("%f", normal.x);
-            render_polygon_wired(ren, &verts[i], &verts[i + 1], &verts[i + 2], &modelMatrix, &projectionMatrix, &normal);
-        }
+        render_plane(verts_plane_f, &modelMatrix, &projectionMatrix);
+        render_plane(verts_plane_b, &modelMatrix, &projectionMatrix);
+        render_plane(verts_plane_l, &modelMatrix, &projectionMatrix);
+        render_plane(verts_plane_r, &modelMatrix, &projectionMatrix);
+        render_plane(verts_plane_t, &modelMatrix, &projectionMatrix);
+        render_plane(verts_plane_bt, &modelMatrix, &projectionMatrix);
 
         SDL_RenderPresent(ren);
 
@@ -329,12 +381,12 @@ int WinMain(int argc, char **args)
 
         while (SDL_PollEvent(&e) != NULL)
         {
-            /*if (e.type == SDL_QUIT)
+            if (e.type == SDL_QUIT)
             {
                 run = false;
             }
 
-            if (e.type == SDL_KEYDOWN)
+            /*if (e.type == SDL_KEYDOWN)
             {
                 if (e.key.keysym.sym == SDLK_UP)
                 {
