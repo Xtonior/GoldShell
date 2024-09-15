@@ -140,7 +140,13 @@ void render_rasterized(SDL_Renderer *renderer, Vec4 *v1, Vec4 *v2, Vec4 *v3, Vec
     int maxX = max(max(v1->x, v2->x), v3->x);
     int maxY = max(max(v1->y, v2->y), v3->y);
 
-    Vec4 col = {0.0f};
+    bool start = true;
+
+    int startX = 0;
+    int startY = 0;
+
+    int endX = 0;
+    int endY = 0;
 
     // Loop through all the pixels of the bounding box
     for (int y = minY; y <= maxY; y++)
@@ -154,19 +160,28 @@ void render_rasterized(SDL_Renderer *renderer, Vec4 *v1, Vec4 *v2, Vec4 *v3, Vec
 
             if (barycentric.x >= 0.0f && barycentric.y >= 0.0f && barycentric.z >= 0.0f)
             {
-                // If all the edge functions are positive, the point is inside the triangle
-                float r = barycentric.x * v1_col->x + barycentric.x * v2_col->x + barycentric.x * v3_col->x;
-                float g = barycentric.y * v1_col->y + barycentric.y * v2_col->y + barycentric.y * v3_col->y;
-                float b = barycentric.z * v1_col->z + barycentric.z * v2_col->z + barycentric.z * v3_col->z;
+                // We don`t fill each pixel one by one for performance
+                if (start)
+                {
+                    startX = x;
+                    startY = y;
 
-                col.x = r;
-                col.y = g;
-                col.z = b;
+                    start = false;
+                }
+
+                endX = x;
+                endY = y;
+
+                float r = v1_col->x + v2_col->x + v3_col->x;
+                float g = v1_col->y + v2_col->y + v3_col->y;
+                float b = v1_col->z + v2_col->z + v3_col->z;
 
                 SDL_SetRenderDrawColor(renderer, r, g, b, SDL_ALPHA_OPAQUE);
-                SDL_RenderDrawPoint(renderer, x, y);
             }
         }
+
+        SDL_RenderDrawLineF(renderer, startX, startY, endX, endY);
+        start = true;
     }
 }
 
@@ -182,9 +197,9 @@ void render_polygon(SDL_Renderer *renderer, Vec4 *v1, Vec4 *v2, Vec4 *v3, Matrix
     Vec4 projectedVertex2 = applyPerspectiveProjection(projectionMatrix, &transformedVertex2);
     Vec4 projectedVertex3 = applyPerspectiveProjection(projectionMatrix, &transformedVertex3);
 
-    float c = get_cull_face_dot(&transformedVertex1, &transformedVertex2, &transformedVertex3);
+    float dot_product = get_cull_face_dot(&transformedVertex1, &transformedVertex2, &transformedVertex3);
 
-    if (c < 0.0f)
+    if (dot_product < 0.0f)
         return;
 
     // Viewport transformations
@@ -195,9 +210,9 @@ void render_polygon(SDL_Renderer *renderer, Vec4 *v1, Vec4 *v2, Vec4 *v3, Matrix
     projectedVertex3.x = (projectedVertex3.x + 1) * SCREEN_WIDTH_HALF;
     projectedVertex3.y = (projectedVertex3.y + 1) * SCREEN_HEIGHT_HALF;
 
-    Vec4 col1 = {255 * c, 0, 0, 255};
-    Vec4 col2 = {255 * c, 0, 0, 255};
-    Vec4 col3 = {0, 0, 255 * c, 255};
+    Vec4 col1 = {255 * dot_product, 255 * dot_product, 255 * dot_product, 255};
+    Vec4 col2 = {0.0f};
+    Vec4 col3 = {0.0f};
 
     render_rasterized(ren, &projectedVertex1, &projectedVertex2, &projectedVertex3, &col1, &col2, &col3);
 }
@@ -220,9 +235,9 @@ int WinMain(int argc, char **args)
     bool run = true;
     SDL_Event e;
 
-    float fov = 170.0f * (M_PI / 180.0f); // Field of view in radians
-    float zNear = 0.1f;                    // Near clipping plane
-    float zFar = 200.0f;                   // Far clipping plane
+    float fov = 60.0f * (M_PI / 180.0f); // Field of view in radians
+    float zNear = 0.1f;                  // Near clipping plane
+    float zFar = 100.0f;                 // Far clipping plane
 
     Matrix4x4 projectionMatrix = getPerspectiveProjection(fov, ASPECT_RATIO, zNear, zFar);
 
@@ -284,10 +299,9 @@ int WinMain(int argc, char **args)
         SDL_RenderClear(ren);
         SDL_SetRenderDrawColor(ren, 255, 255, 255, SDL_ALPHA_OPAQUE);
 
-        // Make clear: object_space -> world_space (model) -> camera_space (view) -> screen_space (projection)
-        for (unsigned int i = 0; i < 250; i++)
+        for (unsigned int i = 0; i < 1; i++)
         {
-            Vec4 movement = {-250.0f * sinf(0.00005f * SDL_GetTicks()), 0.0f, 100.0f, 1.0f};
+            Vec4 movement = {0.0f, 0.0f, 25.0f, 1.0f};
 
             Matrix4x4 rotationMatrix = getRotationMatrixY(SDL_GetTicks() * 0.001f);
             Matrix4x4 extra_rotationMatrix = getRotationMatrixX(SDL_GetTicks() * 0.001f);
