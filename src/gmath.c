@@ -24,7 +24,6 @@ void invert_matrix4x4(const Matrix4x4 *mat, Matrix4x4 *result)
     float i = mat->m[0][2], j = mat->m[1][2], k = mat->m[2][2], l = mat->m[3][2];
     float m = mat->m[0][3], n = mat->m[1][3], o = mat->m[2][3], p = mat->m[3][3];
 
-    // Вычисляем детерминанты 2x2, используемые в формуле инверсии
     float kp_lo = k * p - l * o;
     float jp_ln = j * p - l * n;
     float jo_kn = j * o - k * n;
@@ -32,30 +31,25 @@ void invert_matrix4x4(const Matrix4x4 *mat, Matrix4x4 *result)
     float io_km = i * o - k * m;
     float in_jm = i * n - j * m;
 
-    // Вычисляем алгебраические дополнения
     float a11 = +(f * kp_lo - g * jp_ln + h * jo_kn);
     float a12 = -(e * kp_lo - g * ip_lm + h * io_km);
     float a13 = +(e * jp_ln - f * ip_lm + h * in_jm);
     float a14 = -(e * jo_kn - f * io_km + g * in_jm);
 
-    // Вычисляем детерминант
     float det = a * a11 + b * a12 + c * a13 + d * a14;
 
     if (fabsf(det) < __FLT_EPSILON__)
     {
-        // Матрица вырождена, инверсия невозможна
         return;
     }
 
     float invDet = 1.0f / det;
 
-    // Вычисляем первую строку обратной матрицы
     result->m[0][0] = a11 * invDet;
     result->m[0][1] = a12 * invDet;
     result->m[0][2] = a13 * invDet;
     result->m[0][3] = a14 * invDet;
 
-    // Вычисляем вспомогательные детерминанты
     float gp_ho = g * p - h * o;
     float fp_hn = f * p - h * n;
     float fo_gn = f * o - g * n;
@@ -63,19 +57,16 @@ void invert_matrix4x4(const Matrix4x4 *mat, Matrix4x4 *result)
     float eo_gm = e * o - g * m;
     float en_fm = e * n - f * m;
 
-    // Вычисляем вторую строку
     result->m[1][0] = -(b * kp_lo - c * jp_ln + d * jo_kn) * invDet;
     result->m[1][1] = +(a * kp_lo - c * ip_lm + d * io_km) * invDet;
     result->m[1][2] = -(a * jp_ln - b * ip_lm + d * in_jm) * invDet;
     result->m[1][3] = +(a * jo_kn - b * io_km + c * in_jm) * invDet;
 
-    // Вычисляем третью строку
     result->m[2][0] = +(b * gp_ho - c * fp_hn + d * fo_gn) * invDet;
     result->m[2][1] = -(a * gp_ho - c * ep_hm + d * eo_gm) * invDet;
     result->m[2][2] = +(a * fp_hn - b * ep_hm + d * en_fm) * invDet;
     result->m[2][3] = -(a * fo_gn - b * eo_gm + c * en_fm) * invDet;
 
-    // Вычисляем детерминанты для последней строки
     float gl_hk = g * l - h * k;
     float fl_hj = f * l - h * j;
     float fk_gj = f * k - g * j;
@@ -83,7 +74,6 @@ void invert_matrix4x4(const Matrix4x4 *mat, Matrix4x4 *result)
     float ek_gi = e * k - g * i;
     float ej_fi = e * j - f * i;
 
-    // Вычисляем последнюю строку
     result->m[3][0] = -(b * gl_hk - c * fl_hj + d * fk_gj) * invDet;
     result->m[3][1] = +(a * gl_hk - c * el_hi + d * ek_gi) * invDet;
     result->m[3][2] = -(a * fl_hj - b * el_hi + d * ej_fi) * invDet;
@@ -99,6 +89,16 @@ void transpose_matrix4x4(Matrix4x4 *in, Matrix4x4 *out)
             out->m[i][j] = in->m[j][i];
         }
     }
+}
+
+int max(int a, int b)
+{
+    return a > b ? a : b;
+}
+
+int min(int a, int b)
+{
+    return a < b ? a : b;
 }
 
 double dot(Vec4 *a, Vec4 *b)
@@ -220,7 +220,6 @@ Vec4 applyPerspectiveProjection(const Matrix4x4 *projMatrix, const Vec4 *vertex)
 {
     Vec4 transformed = multiplyMatrixVec4(projMatrix, vertex);
 
-    // Perform perspective divide
     if (transformed.w != 0.0f)
     {
         transformed.x /= transformed.w;
@@ -261,6 +260,11 @@ Vec4 vec4_mul_scalar(Vec4 *a, float scalar)
     return (Vec4){a->x * scalar, a->y * scalar, a->z * scalar, a->w * scalar};
 }
 
+Vec4 vec4_div(Vec4 *a, Vec4 *b)
+{
+    return (Vec4){a->x / b->x, a->y / b->y, a->z / b->z, a->w / b->w};
+}
+
 Vec4 vec4_cross(Vec4 *a, Vec4 * b)
 {
     return (Vec4){
@@ -272,4 +276,24 @@ Vec4 vec4_cross(Vec4 *a, Vec4 * b)
 Vec4 vec4_neg(Vec4 *a)
 {
     return (Vec4){-a->x, -a->y, -a->z, -a->w};
+}
+
+Vec4 vec4_min(const Vec4 *a, const Vec4 *b)
+{
+    Vec4 result;
+    result.x = (a->x < b->x) ? b->x : b->x;
+    result.y = (a->y < b->y) ? b->y : b->y;
+    result.z = (a->z < b->z) ? b->z : b->z;
+    result.w = (a->w < b->w) ? b->w : b->w;
+    return result;
+}
+
+Vec4 vec4_max(const Vec4 *a, const Vec4 *b)
+{
+    Vec4 result;
+    result.x = (a->x > b->x) ? b->x : b->x;
+    result.y = (a->y > b->y) ? b->y : b->y;
+    result.z = (a->z > b->z) ? b->z : b->z;
+    result.w = (a->w > b->w) ? b->w : b->w;
+    return result;
 }

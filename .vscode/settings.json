@@ -4,6 +4,10 @@
         "scrollbar.shadow": "#00000000"
     },
     "files.associations": {
-        "math.h": "c"
+        "math.h": "c",
+        "limits": "c",
+        "stdbool.h": "c",
+        "sdl.h": "c",
+        "stdio.h": "c"
     }
 }

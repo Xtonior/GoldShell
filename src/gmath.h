@@ -27,6 +27,9 @@ void vec4_normalize(Vec4 *a, Vec4 *out);
 void invert_matrix4x4(const Matrix4x4 *mat, Matrix4x4 *result);
 void transpose_matrix4x4(Matrix4x4 *in, Matrix4x4 *out);
 
+int max(int a, int b);
+int min(int a, int b);
+
 double dot(Vec4 *a, Vec4 *b);
 
 Matrix4x4 getPerspectiveProjection(float fov, float aspect, float zNear, float zFar);
@@ -43,7 +46,11 @@ Vec4 vec4_add(Vec4 *a, Vec4 *b);
 Vec4 vec4_sub(Vec4 *a, Vec4 *b);
 Vec4 vec4_mul(Vec4 *a, Vec4 *b);
 Vec4 vec4_mul_scalar(Vec4 *a, float scalar);
+Vec4 vec4_div(Vec4 *a, Vec4 *b);
 Vec4 vec4_cross(Vec4 *a, Vec4 * b);
 Vec4 vec4_neg(Vec4 *a);
+
+Vec4 vec4_min(const Vec4 *a, const Vec4 *b);
+Vec4 vec4_max(const Vec4 *a, const Vec4 *b);
 
 #endif
